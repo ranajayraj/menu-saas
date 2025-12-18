@@ -20,26 +20,35 @@ export async function generateMetadata({ params }) {
 
   if (!data) return { title: 'Not Found' };
 
+  // Use the uploaded URL or fallback to a default image in public folder
+  const iconUrl = data.favicon_url || '/logo.png';
+
   return {
     title: `${data.name} | View Menu`,
     description: data.description,
-    keywords: data.seo_keywords, // Uses the new column
+    keywords: data.seo_keywords,
+
+    // ⬇️ UPDATED ICONS SECTION
     icons: {
-      icon: data.favicon_url || '/favicon.ico', // <--- Uses Client Favicon or Default
-      shortcut: data.favicon_url || '/favicon.ico',
-      apple: data.favicon_url || '/apple-icon.png', // Fallback if no specific apple icon
+      icon: [
+        { url: iconUrl, sizes: '32x32', type: 'image/png' },
+        { url: iconUrl, sizes: '192x192', type: 'image/png' },
+        { url: iconUrl, sizes: '512x512', type: 'image/png' },
+      ],
+      shortcut: [
+        { url: iconUrl }
+      ],
+      apple: [
+        { url: iconUrl, sizes: '180x180', type: 'image/png' },
+      ],
     },
+    // ⬆️ END UPDATED SECTION
+
     openGraph: {
       title: data.name,
       description: data.description,
-      images: [data.og_image_url || data.logo_url], // Uses the social image
-      type: 'website',
-    },
-    twitter: {
-      card: 'summary_large_image',
-      title: data.name,
-      description: data.description,
       images: [data.og_image_url || data.logo_url],
+      type: 'website',
     },
   };
 }
