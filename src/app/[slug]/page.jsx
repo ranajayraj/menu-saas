@@ -24,7 +24,7 @@ export async function generateMetadata({ params }) {
   const iconUrl = data.favicon_url || '/logo.png';
 
   return {
-    title: `${data.name} | View Menu`,
+    title: data.seo_title || `${data.name}`,
     description: data.description,
     keywords: data.seo_keywords,
 
@@ -45,7 +45,7 @@ export async function generateMetadata({ params }) {
     // ⬆️ END UPDATED SECTION
 
     openGraph: {
-      title: data.name,
+      title: data.seo_title || data.name,
       description: data.description,
       images: [data.og_image_url || data.logo_url],
       type: 'website',

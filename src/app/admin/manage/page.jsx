@@ -20,10 +20,10 @@ function ClientForm() {
 
   const [loading, setLoading] = useState(false);
   
-  // -- Form State --
   const [formData, setFormData] = useState({
     name: '',
     slug: '',
+    seoTitle: '', // <--- 1. NEW STATE
     description: '',
     keywords: '',
     address: '',
@@ -32,14 +32,14 @@ function ClientForm() {
     pdfUrl: '',
     logoUrl: '',
     ogImageUrl: '',
-    faviconUrl: '' // <--- NEW STATE
+    faviconUrl: ''
   });
 
   const [files, setFiles] = useState({ 
     pdf: null, 
     logo: null, 
     ogImage: null, 
-    favicon: null // <--- NEW STATE
+    favicon: null 
   });
 
   // 1. Fetch Existing Data
@@ -51,12 +51,13 @@ function ClientForm() {
           setFormData({
             name: data.name,
             slug: data.slug,
+            seoTitle: data.seo_title || '', // <--- 2. FETCH IT
             description: data.description,
             keywords: data.seo_keywords || '',
             pdfUrl: data.pdf_url,
             logoUrl: data.logo_url,
             ogImageUrl: data.og_image_url || '',
-            faviconUrl: data.favicon_url || '', // <--- NEW FETCH
+            faviconUrl: data.favicon_url || '',
             address: data.json_ld?.address?.streetAddress || '',
             phone: data.json_ld?.telephone || '',
             priceRange: data.json_ld?.priceRange || '₹300 - ₹2500',
@@ -67,10 +68,27 @@ function ClientForm() {
     }
   }, [editId]);
 
+  // HELPER: Extract path from URL
+  const extractFilePath = (url) => {
+    if (!url) return null;
+    const parts = url.split('/client-assets/');
+    return parts.length > 1 ? parts[1] : null;
+  };
+
+  // HELPER: Delete old file from Storage
+  const deleteOldFile = async (fullUrl) => {
+    const path = extractFilePath(fullUrl);
+    if (path) {
+      console.log("Deleting old file:", path);
+      await supabase.storage.from('client-assets').remove([path]);
+    }
+  };
+
   // 2. Upload Helper
   const uploadFile = async (file, folder) => {
     if (!file) return null;
-    const fileName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.]/g, '')}`;
+    const cleanName = file.name.replace(/[^a-zA-Z0-9.]/g, '');
+    const fileName = `${Date.now()}-${cleanName}`;
     const { error } = await supabase.storage.from('client-assets').upload(`${folder}/${fileName}`, file);
     if (error) throw error;
     const { data } = supabase.storage.from('client-assets').getPublicUrl(`${folder}/${fileName}`);
@@ -83,18 +101,36 @@ function ClientForm() {
     setLoading(true);
 
     try {
-      // Upload new files if selected
-      const newPdfUrl = files.pdf ? await uploadFile(files.pdf, 'pdfs') : formData.pdfUrl;
-      const newLogoUrl = files.logo ? await uploadFile(files.logo, 'logos') : formData.logoUrl;
-      const newOgUrl = files.ogImage ? await uploadFile(files.ogImage, 'social') : formData.ogImageUrl;
-      const newFaviconUrl = files.favicon ? await uploadFile(files.favicon, 'favicons') : formData.faviconUrl; // <--- NEW UPLOAD
+      // CHECK & DELETE OLD FILES BEFORE UPLOADING NEW ONES
+      let finalPdfUrl = formData.pdfUrl;
+      if (files.pdf) {
+        if (formData.pdfUrl) await deleteOldFile(formData.pdfUrl);
+        finalPdfUrl = await uploadFile(files.pdf, 'pdfs');
+      }
 
-      // Schema Object
+      let finalLogoUrl = formData.logoUrl;
+      if (files.logo) {
+        if (formData.logoUrl) await deleteOldFile(formData.logoUrl);
+        finalLogoUrl = await uploadFile(files.logo, 'logos');
+      }
+
+      let finalOgUrl = formData.ogImageUrl;
+      if (files.ogImage) {
+        if (formData.ogImageUrl) await deleteOldFile(formData.ogImageUrl);
+        finalOgUrl = await uploadFile(files.ogImage, 'social');
+      }
+
+      let finalFaviconUrl = formData.faviconUrl;
+      if (files.favicon) {
+        if (formData.faviconUrl) await deleteOldFile(formData.faviconUrl);
+        finalFaviconUrl = await uploadFile(files.favicon, 'favicons');
+      }
+
       const jsonLd = {
         "@context": "https://schema.org",
         "@type": "Bakery",
         "name": formData.name,
-        "image": newOgUrl,
+        "image": finalOgUrl,
         "description": formData.description,
         "telephone": formData.phone,
         "priceRange": formData.priceRange,
@@ -109,12 +145,13 @@ function ClientForm() {
       const payload = {
         name: formData.name,
         slug: formData.slug.toLowerCase().replace(/ /g, '-'),
+        seo_title: formData.seoTitle, // <--- 3. SAVE IT
         description: formData.description,
         seo_keywords: formData.keywords,
-        pdf_url: newPdfUrl,
-        logo_url: newLogoUrl,
-        og_image_url: newOgUrl,
-        favicon_url: newFaviconUrl, // <--- SAVE TO DB
+        pdf_url: finalPdfUrl,
+        logo_url: finalLogoUrl,
+        og_image_url: finalOgUrl,
+        favicon_url: finalFaviconUrl,
         json_ld: jsonLd
       };
 
@@ -164,9 +201,9 @@ function ClientForm() {
           {/* Section 2: Files */}
           <div className="bg-blue-50 p-4 rounded border border-blue-100 space-y-4">
             <h3 className="font-bold text-blue-800">Files</h3>
-            <div className="grid grid-cols-2 gap-4"> {/* Changed to grid-cols-2 for better layout */}
+            <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2">
-                <label className="block text-xs font-bold mb-1">Menu PDF (Required)</label>
+                <label className="block text-xs font-bold mb-1">Menu PDF</label>
                 <input type="file" accept="application/pdf" className="text-sm w-full border p-2 bg-white rounded"
                   onChange={e => setFiles({...files, pdf: e.target.files[0]})} />
                 {formData.pdfUrl && <span className="text-xs text-green-600 block mt-1">✓ Current PDF Loaded</span>}
@@ -179,7 +216,6 @@ function ClientForm() {
                   {formData.logoUrl && <span className="text-xs text-green-600 block mt-1">✓ Current Logo Loaded</span>}
               </div>
 
-              {/* NEW FAVICON INPUT */}
               <div>
                 <label className="block text-xs font-bold mb-1">Favicon (Square PNG/ICO)</label>
                 <input type="file" accept="image/*" className="text-sm w-full border p-2 bg-white rounded"
@@ -199,6 +235,15 @@ function ClientForm() {
           {/* Section 3: Advanced SEO */}
           <div className="space-y-3">
              <h3 className="font-bold border-b pb-1">SEO Details</h3>
+             
+             {/* --- 4. NEW INPUT FIELD --- */}
+             <div>
+                <label className="block text-sm font-bold mb-1">SEO Page Title (Browser Tab)</label>
+                <input className="w-full border p-2 rounded" placeholder="e.g. Best Cakes in Surat | Sweet Tooth"
+                  value={formData.seoTitle} onChange={e => setFormData({...formData, seoTitle: e.target.value})} />
+             </div>
+             {/* ------------------------- */}
+
              <div>
                 <label className="block text-sm font-bold mb-1">SEO Description</label>
                 <textarea required className="w-full border p-2 rounded h-20"
