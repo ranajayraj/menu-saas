@@ -2,7 +2,7 @@ import { supabase } from '@/lib/supabase';
 import Image from 'next/image';
 import Link from 'next/link';
 
-// 1. Fetch Helper (This part is PERFECT)
+// 1. Fetch Helper
 async function getClientData(slug) {
   const { data, error } = await supabase
     .from('clients')
@@ -10,59 +10,78 @@ async function getClientData(slug) {
     .eq('slug', slug)
     .limit(1)
     .maybeSingle();
-
-  if (error) console.log("Supabase Error:", error);
   return data;
 }
 
-// 2. SEO
+// 2. SEO Generation (The "Head" part)
 export async function generateMetadata({ params }) {
-  const { slug } = await params; // <--- NEW: You must await params in Next.js 15
-
+  const { slug } = await params;
   const data = await getClientData(slug);
+  
   if (!data) return { title: 'Not Found' };
 
   return {
-    title: `${data.name} - View Menu`,
+    title: `${data.name} | View Menu`,
     description: data.description,
+    keywords: data.seo_keywords, // Uses the new column
+    openGraph: {
+      title: data.name,
+      description: data.description,
+      images: [data.og_image_url || data.logo_url], // Uses the social image
+      type: 'website',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: data.name,
+      description: data.description,
+      images: [data.og_image_url || data.logo_url],
+    },
   };
 }
 
-// 3. Page
+// 3. The Page Body
 export default async function ClientMenuPage({ params }) {
-  const { slug } = await params; // <--- NEW: You must await params here too
-
+  const { slug } = await params;
   const data = await getClientData(slug);
 
-  if (!data) {
-    return <div className="p-10 text-center text-red-500">Client not found in database.</div>;
-  }
+  if (!data) return <div className="p-10 text-center">Client Not Found</div>;
 
   return (
-    <div className="bg-[#f2f2f2] h-screen flex flex-col items-center justify-center gap-8 px-6 py-3">
+    <>
+      {/* 4. Inject JSON-LD Schema Script */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(data.json_ld) }}
+      />
 
-      {/* Logic to show Logo OR Name if logo is missing */}
-      {data.logo_url ? (
-        <Image
-          className="w-full max-w-64 object-contain"
-          src={data.logo_url}
-          alt={data.name}
-          width={200}
-          height={200}
-          priority
-          unoptimized
-        />
-      ) : (
-        <h1 className="text-4xl font-bold text-[#603f36]">{data.name}</h1>
-      )}
+      <div className="bg-[#f2f2f2] min-h-screen flex flex-col items-center justify-center gap-8 px-6 py-3">
+        
+        {/* Dynamic Logo */}
+        {data.logo_url ? (
+          <Image
+            className="w-full max-w-64 object-contain" 
+            src={data.logo_url} 
+            alt={`${data.name} Logo`}
+            width={200}
+            height={200}
+            priority
+            unoptimized 
+          />
+        ) : (
+          <h1 className="text-4xl font-bold text-[#603f36]">{data.name}</h1>
+        )}
 
-      <Link
-        href={data.pdf_url}
-        target="_blank"
-        className="bg-[#603f36] hover:bg-[#603f36]/90 text-white duration-300 text-lg font-bold px-8 py-4 text-center rounded shadow-lg uppercase"
-      >
-        View Our Menu
-      </Link>
-    </div>
+        {/* Dynamic PDF Link */}
+        <Link
+          href={data.pdf_url}
+          target="_blank"
+          className="bg-[#603f36] hover:bg-[#603f36]/90 text-white duration-300 text-lg font-bold px-8 py-4 text-center rounded shadow-lg uppercase tracking-wide"
+        >
+          View Our Menu
+        </Link>
+        
+        <p className="text-gray-400 text-xs mt-10">Powered by Jayraj Rana</p>
+      </div>
+    </>
   );
 }

@@ -25,7 +25,5 @@
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: "GoodBakwan" ,"Arial", Helvetica, sans-serif;
+  font-family: "inter", Helvetica, sans-serif;
 }
