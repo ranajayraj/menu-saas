@@ -1,81 +1,35 @@
 import { supabase } from '@/lib/supabase';
+import { NextResponse } from 'next/server';
 
-// 1. Fetch Helper (Same as your main page)
-async function getClientData(slug) {
+export async function GET(request, { params }) {
+  const { slug } = await params;
+
+  // 1. Find the Client in Database
   const { data } = await supabase
     .from('clients')
-    .select('*')
+    .select('pdf_url')
     .eq('slug', slug)
-    .limit(1)
-    .maybeSingle();
-  return data;
-}
-
-// 2. SEO Generation (COPIED EXACTLY FROM YOUR MAIN PAGE)
-export async function generateMetadata({ params }) {
-  const { slug } = await params;
-  const data = await getClientData(slug);
-
-  if (!data) return { title: 'Not Found' };
-
-  // Use the uploaded URL or fallback to a default image
-  const iconUrl = data.favicon_url || '/logo.png';
-
-  return {
-    title: data.seo_title || `${data.name}`,
-    description: data.description,
-    keywords: data.seo_keywords,
-
-    // ⬇️ EXACT SAME ICON LOGIC
-    icons: {
-      icon: [
-        { url: iconUrl, sizes: '32x32', type: 'image/png' },
-        { url: iconUrl, sizes: '192x192', type: 'image/png' },
-        { url: iconUrl, sizes: '512x512', type: 'image/png' },
-      ],
-      shortcut: [
-        { url: iconUrl }
-      ],
-      apple: [
-        { url: iconUrl, sizes: '180x180', type: 'image/png' },
-      ],
-    },
-    // ⬆️ END ICON LOGIC
-
-    openGraph: {
-      title: data.seo_title || data.name,
-      description: data.description,
-      images: [data.og_image_url || data.logo_url], // Shows big image on WhatsApp
-      type: 'website',
-    },
-  };
-}
-
-// 3. The Page Body
-export default async function PDFWrapperPage({ params }) {
-  const { slug } = await params;
-  const data = await getClientData(slug);
+    .single();
 
   if (!data || !data.pdf_url) {
-    return <div className="text-center p-10 font-sans">Menu PDF not found in database.</div>;
+    return new NextResponse('PDF Not Found', { status: 404 });
   }
 
-  return (
-    <>
-      {/* 4. Inject JSON-LD Schema (So Google knows this PDF belongs to the Business) */}
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(data.json_ld) }}
-      />
+  // 2. Fetch the file from Supabase (Server-side)
+  const fileResponse = await fetch(data.pdf_url);
 
-      <div className="h-screen w-screen bg-gray-100 flex flex-col overflow-hidden">
-        {/* The PDF Viewer */}
-        <iframe
-          src={data.pdf_url}
-          className="w-full h-full border-none"
-          title={`${data.name} Menu`}
-        />
-      </div>
-    </>
-  );
+  if (!fileResponse.ok) {
+    return new NextResponse('Error fetching PDF', { status: 500 });
+  }
+
+  // 3. Serve it as if it came from YOUR website
+  const blob = await fileResponse.blob();
+  
+  return new NextResponse(blob, {
+    headers: {
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': 'inline; filename="menu.pdf"', // 'inline' opens in browser, 'attachment' downloads it
+      'Cache-Control': 'public, max-age=3600' // Cache for 1 hour to make it fast
+    },
+  });
 }
