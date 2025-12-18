@@ -87,7 +87,7 @@ export default async function ClientMenuPage({ params }) {
 
         {/* Dynamic PDF Link */}
         <Link
-          href={data.pdf_url}
+          href={`/${slug}/pdf`}
           target="_blank"
           className="bg-[#603f36] hover:bg-[#603f36]/90 text-white duration-300 text-lg font-bold px-8 py-4 text-center rounded shadow-lg uppercase tracking-wide"
         >
