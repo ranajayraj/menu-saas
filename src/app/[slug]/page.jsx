@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import Image from 'next/image';
 import Link from 'next/link';
 
 // 1. Fetch Helper (This part is PERFECT)
@@ -7,8 +8,8 @@ async function getClientData(slug) {
     .from('clients')
     .select('*')
     .eq('slug', slug)
-    .limit(1)        
-    .maybeSingle();  
+    .limit(1)
+    .maybeSingle();
 
   if (error) console.log("Supabase Error:", error);
   return data;
@@ -17,7 +18,7 @@ async function getClientData(slug) {
 // 2. SEO
 export async function generateMetadata({ params }) {
   const { slug } = await params; // <--- NEW: You must await params in Next.js 15
-  
+
   const data = await getClientData(slug);
   if (!data) return { title: 'Not Found' };
 
@@ -30,7 +31,7 @@ export async function generateMetadata({ params }) {
 // 3. Page
 export default async function ClientMenuPage({ params }) {
   const { slug } = await params; // <--- NEW: You must await params here too
-  
+
   const data = await getClientData(slug);
 
   if (!data) {
@@ -42,7 +43,15 @@ export default async function ClientMenuPage({ params }) {
 
       {/* Logic to show Logo OR Name if logo is missing */}
       {data.logo_url ? (
-        <img className="w-full max-w-64 object-contain" src={data.logo_url} alt="Logo" />
+        <Image
+          className="w-full max-w-64 object-contain"
+          src={data.logo_url}
+          alt={data.name}
+          width={200}
+          height={200}
+          priority
+          unoptimized
+        />
       ) : (
         <h1 className="text-4xl font-bold text-[#603f36]">{data.name}</h1>
       )}
