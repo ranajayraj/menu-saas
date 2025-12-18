@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
-// We wrap in Suspense because we use useSearchParams
 export default function ManageClient() {
   return (
     <Suspense fallback={<div>Loading...</div>}>
@@ -17,7 +16,7 @@ export default function ManageClient() {
 function ClientForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const editId = searchParams.get('id'); // If URL has ?id=123, we are editing
+  const editId = searchParams.get('id');
 
   const [loading, setLoading] = useState(false);
   
@@ -26,24 +25,29 @@ function ClientForm() {
     name: '',
     slug: '',
     description: '',
-    keywords: '', // New
-    address: '', // For Schema
-    phone: '',   // For Schema
-    priceRange: '₹300 - ₹2500', // For Schema
+    keywords: '',
+    address: '',
+    phone: '',
+    priceRange: '₹300 - ₹2500',
     pdfUrl: '',
     logoUrl: '',
-    ogImageUrl: '' // New
+    ogImageUrl: '',
+    faviconUrl: '' // <--- NEW STATE
   });
 
-  const [files, setFiles] = useState({ pdf: null, logo: null, ogImage: null });
+  const [files, setFiles] = useState({ 
+    pdf: null, 
+    logo: null, 
+    ogImage: null, 
+    favicon: null // <--- NEW STATE
+  });
 
-  // 1. If Editing, Fetch Existing Data
+  // 1. Fetch Existing Data
   useEffect(() => {
     if (editId) {
       const fetchData = async () => {
         const { data } = await supabase.from('clients').select('*').eq('id', editId).single();
         if (data) {
-          // Extract simple fields
           setFormData({
             name: data.name,
             slug: data.slug,
@@ -52,7 +56,7 @@ function ClientForm() {
             pdfUrl: data.pdf_url,
             logoUrl: data.logo_url,
             ogImageUrl: data.og_image_url || '',
-            // Extract Schema details if they exist
+            faviconUrl: data.favicon_url || '', // <--- NEW FETCH
             address: data.json_ld?.address?.streetAddress || '',
             phone: data.json_ld?.telephone || '',
             priceRange: data.json_ld?.priceRange || '₹300 - ₹2500',
@@ -63,7 +67,7 @@ function ClientForm() {
     }
   }, [editId]);
 
-  // 2. Helper: Upload File to Supabase
+  // 2. Upload Helper
   const uploadFile = async (file, folder) => {
     if (!file) return null;
     const fileName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.]/g, '')}`;
@@ -79,12 +83,13 @@ function ClientForm() {
     setLoading(true);
 
     try {
-      // A. Upload new files if selected
+      // Upload new files if selected
       const newPdfUrl = files.pdf ? await uploadFile(files.pdf, 'pdfs') : formData.pdfUrl;
       const newLogoUrl = files.logo ? await uploadFile(files.logo, 'logos') : formData.logoUrl;
       const newOgUrl = files.ogImage ? await uploadFile(files.ogImage, 'social') : formData.ogImageUrl;
+      const newFaviconUrl = files.favicon ? await uploadFile(files.favicon, 'favicons') : formData.faviconUrl; // <--- NEW UPLOAD
 
-      // B. Construct JSON-LD Schema Object
+      // Schema Object
       const jsonLd = {
         "@context": "https://schema.org",
         "@type": "Bakery",
@@ -100,25 +105,24 @@ function ClientForm() {
         }
       };
 
-      // C. Save to Database
+      // Payload
       const payload = {
         name: formData.name,
-        slug: formData.slug.toLowerCase().replace(/ /g, '-'), // Ensure slug format
+        slug: formData.slug.toLowerCase().replace(/ /g, '-'),
         description: formData.description,
         seo_keywords: formData.keywords,
         pdf_url: newPdfUrl,
         logo_url: newLogoUrl,
         og_image_url: newOgUrl,
-        json_ld: jsonLd // Save the JSON object directly
+        favicon_url: newFaviconUrl, // <--- SAVE TO DB
+        json_ld: jsonLd
       };
 
       let error;
       if (editId) {
-        // Update existing
         const res = await supabase.from('clients').update(payload).eq('id', editId);
         error = res.error;
       } else {
-        // Create new
         const res = await supabase.from('clients').insert([payload]);
         error = res.error;
       }
@@ -126,7 +130,7 @@ function ClientForm() {
       if (error) throw error;
 
       toast.success("Saved Successfully!");
-      setTimeout(() => router.push('/admin'), 1500); // Go back to dashboard
+      setTimeout(() => router.push('/admin'), 1500);
 
     } catch (err) {
       console.error(err);
@@ -160,21 +164,32 @@ function ClientForm() {
           {/* Section 2: Files */}
           <div className="bg-blue-50 p-4 rounded border border-blue-100 space-y-4">
             <h3 className="font-bold text-blue-800">Files</h3>
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <label className="block text-xs font-bold mb-1">Menu PDF</label>
-                <input type="file" accept="application/pdf" className="text-sm"
+            <div className="grid grid-cols-2 gap-4"> {/* Changed to grid-cols-2 for better layout */}
+              <div className="col-span-2">
+                <label className="block text-xs font-bold mb-1">Menu PDF (Required)</label>
+                <input type="file" accept="application/pdf" className="text-sm w-full border p-2 bg-white rounded"
                   onChange={e => setFiles({...files, pdf: e.target.files[0]})} />
                 {formData.pdfUrl && <span className="text-xs text-green-600 block mt-1">✓ Current PDF Loaded</span>}
               </div>
+
               <div>
                 <label className="block text-xs font-bold mb-1">Logo (PNG)</label>
-                <input type="file" accept="image/*" className="text-sm"
+                <input type="file" accept="image/*" className="text-sm w-full border p-2 bg-white rounded"
                   onChange={e => setFiles({...files, logo: e.target.files[0]})} />
+                  {formData.logoUrl && <span className="text-xs text-green-600 block mt-1">✓ Current Logo Loaded</span>}
               </div>
+
+              {/* NEW FAVICON INPUT */}
               <div>
+                <label className="block text-xs font-bold mb-1">Favicon (Square PNG/ICO)</label>
+                <input type="file" accept="image/*" className="text-sm w-full border p-2 bg-white rounded"
+                  onChange={e => setFiles({...files, favicon: e.target.files[0]})} />
+                 {formData.faviconUrl && <span className="text-xs text-green-600 block mt-1">✓ Current Favicon Loaded</span>}
+              </div>
+
+              <div className="col-span-2">
                 <label className="block text-xs font-bold mb-1">Social Share Image (1200x630)</label>
-                <input type="file" accept="image/*" className="text-sm"
+                <input type="file" accept="image/*" className="text-sm w-full border p-2 bg-white rounded"
                   onChange={e => setFiles({...files, ogImage: e.target.files[0]})} />
                  {formData.ogImageUrl && <span className="text-xs text-green-600 block mt-1">✓ Current Image Loaded</span>}
               </div>
@@ -190,15 +205,15 @@ function ClientForm() {
                   value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} />
              </div>
              <div>
-                <label className="block text-sm font-bold mb-1">Keywords (Comma separated)</label>
+                <label className="block text-sm font-bold mb-1">Keywords</label>
                 <input className="w-full border p-2 rounded" placeholder="cakes, bakery, surat..."
                   value={formData.keywords} onChange={e => setFormData({...formData, keywords: e.target.value})} />
              </div>
           </div>
 
-          {/* Section 4: Schema Generator (Business Info) */}
+          {/* Section 4: Schema Generator */}
           <div className="bg-gray-50 p-4 rounded border space-y-3">
-             <h3 className="font-bold border-b pb-1 text-gray-700">Business Schema (For Google)</h3>
+             <h3 className="font-bold border-b pb-1 text-gray-700">Business Schema</h3>
              <div className="grid grid-cols-2 gap-4">
                <div>
                   <label className="block text-xs font-bold mb-1">Phone Number</label>
