@@ -22,14 +22,15 @@ export async function GET(request, { params }) {
     return new NextResponse('Error fetching PDF', { status: 500 });
   }
 
-  // 3. Serve it as if it came from YOUR website
+  // 3. Serve the raw PDF directly to the browser
   const blob = await fileResponse.blob();
   
   return new NextResponse(blob, {
     headers: {
       'Content-Type': 'application/pdf',
-      'Content-Disposition': 'inline; filename="menu.pdf"', // 'inline' opens in browser, 'attachment' downloads it
-      'Cache-Control': 'public, max-age=3600' // Cache for 1 hour to make it fast
+      // "inline" means open in browser. "attachment" means force download.
+      'Content-Disposition': 'inline; filename="menu.pdf"', 
+      'Cache-Control': 'public, max-age=3600'
     },
   });
 }
